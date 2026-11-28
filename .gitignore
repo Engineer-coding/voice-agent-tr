@@ -15,3 +15,5 @@ build/
 *.onnx
 models/
 data/
+# Değerlendirme raporları (CI'da artefakt olarak saklanır)
+eval/reports/

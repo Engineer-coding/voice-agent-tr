@@ -112,7 +112,7 @@ class RuleBasedLLM:
             return _call(ToolName.TRANSFER_TO_AGENT, reason="Müşteri temsilci istedi")
 
         if request.phase == Phase.AUTHENTICATION:
-            return self._authenticate(user_text)
+            return self._authenticate(request)
 
         if request.authenticated:
             intent = detect_intent(user_text)
@@ -140,8 +140,17 @@ class RuleBasedLLM:
                     reply="Fatura, paket değişikliği veya arıza kaydı konusunda yardımcı olabilirim."
                 )
 
-    def _authenticate(self, text: str) -> LLMDecision:
-        phone, birth = find_phone(text), find_birth_date(text)
+    def _authenticate(self, request: LLMRequest) -> LLMDecision:
+        # Son doğrulama denemesinden bu yana müşterinin söylediklerini birlikte değerlendir:
+        # numara ve doğum tarihi ayrı turlarda verilebilir.
+        texts: list[str] = []
+        for message in reversed(request.messages):
+            if message.role == "tool" and message.tool_name == ToolName.VERIFY_IDENTITY:
+                break
+            if message.role == "user":
+                texts.insert(0, message.content)
+        phone = next((p for t in reversed(texts) if (p := find_phone(t))), None)
+        birth = next((b for t in reversed(texts) if (b := find_birth_date(t))), None)
         if phone and birth:
             return _call(ToolName.VERIFY_IDENTITY, phone=phone, birth_date=birth.isoformat())
         if phone:
@@ -169,7 +178,8 @@ class RuleBasedLLM:
             if any(w in lowered for w in words):
                 category = name
                 break
-        if len(text.strip()) < 3:
+        generic_request = category == "diger" and re.search(r"arıza\s+(kayd|bildir)", lowered)
+        if len(text.strip()) < 3 or generic_request:
             return LLMDecision(reply="Yaşadığınız sorunu biraz anlatır mısınız?")
         return _call(ToolName.CREATE_FAULT_TICKET, category=category, description=text.strip())
 

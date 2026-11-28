@@ -17,9 +17,10 @@ typecheck:
 test:
 	uv run pytest
 
-# Aşama 2'de değerlendirme altyapısı eklenecek.
+# 30 senaryo + 25 injection saldırısı; rapor eval/reports/ altına yazılır.
+# Görev başarısı %85'in altındaysa veya tek bir yetkisiz araç çağrısı varsa hata döner.
 eval:
-	@echo "make eval: henüz senaryo yok (Aşama 2)."
+	uv run python -m voice_agent.evaluation
 
 check: lint typecheck test
 

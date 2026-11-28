@@ -33,7 +33,7 @@ Varsayım: GPU yok, her şey CPU'da çalışmalı.
 - `make lint` / `make format`: ruff
 - `make typecheck`: mypy (strict)
 - `make test`: pytest
-- `make eval`: değerlendirme raporu
+- `make eval`: 30 senaryo + 25 injection saldırısı (normal ve ele geçirilmiş LLM); eşik altında hata döner
 - `make check`: lint + typecheck + test
 - `make chat`: terminalden asistanla yazışma (kural tabanlı LLM, sahte CRM süreç içinde)
 - `make crm`: sahte CRM servisini 8100 portunda çalıştır
