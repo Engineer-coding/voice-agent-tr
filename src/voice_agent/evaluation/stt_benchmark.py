@@ -199,7 +199,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--samples", type=int, default=100)
     parser.add_argument("--models", nargs="+", default=["tiny", "base", "small", "medium"])
-    parser.add_argument("--e2e-model", default="large-v3-turbo")
+    parser.add_argument("--e2e-model", default="small")
     parser.add_argument("--out", type=Path, default=Path("eval/reports/bench"))
     args = parser.parse_args(argv)
     args.out.mkdir(parents=True, exist_ok=True)

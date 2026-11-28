@@ -13,7 +13,7 @@ on:
         default: "tiny base small medium large-v3-turbo"
       e2e_model:
         description: Uçtan uca hatta kullanılacak model
-        default: "large-v3-turbo"
+        default: "small"
   push:
     paths:
       - "src/voice_agent/audio/**"
@@ -42,7 +42,7 @@ jobs:
         env:
           SAMPLES: ${{ github.event.inputs.samples || '100' }}
           MODELS: ${{ github.event.inputs.models || 'tiny base small medium large-v3-turbo' }}
-          E2E_MODEL: ${{ github.event.inputs.e2e_model || 'large-v3-turbo' }}
+          E2E_MODEL: ${{ github.event.inputs.e2e_model || 'small' }}
         run: |
           nproc
           uv run --extra audio python -m voice_agent.evaluation.stt_benchmark \
