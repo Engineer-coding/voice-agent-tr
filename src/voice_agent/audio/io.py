@@ -1,5 +1,6 @@
 """WAV okuma/yazma ve basit yeniden örnekleme. Ek bağımlılık olmadan (stdlib `wave` + numpy)."""
 
+import struct
 import wave
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,13 +25,38 @@ class AudioClip:
         return len(self.samples) / self.sample_rate
 
 
+_PCM, _FLOAT = 1, 3
+
+
 def read_wav(path: Path) -> AudioClip:
-    with wave.open(str(path), "rb") as wav:
-        channels, width, rate = wav.getnchannels(), wav.getsampwidth(), wav.getframerate()
-        frames = wav.readframes(wav.getnframes())
-    if width != 2:
-        raise ValueError(f"Yalnızca 16 bit PCM desteklenir: {path}")
-    data = np.frombuffer(frames, dtype="<i2").astype(np.float32) / 32768.0
+    """16 bit PCM veya 32 bit float WAV okur (FLEURS float32 kullanır)."""
+    raw = path.read_bytes()
+    if raw[:4] != b"RIFF" or raw[8:12] != b"WAVE":
+        raise ValueError(f"WAV dosyası değil: {path}")
+    fmt: tuple[int, int, int, int] | None = None
+    frames = b""
+    pos = 12
+    while pos + 8 <= len(raw):
+        chunk_id, size = raw[pos : pos + 4], struct.unpack("<I", raw[pos + 4 : pos + 8])[0]
+        body = raw[pos + 8 : pos + 8 + size]
+        if chunk_id == b"fmt ":
+            tag, channels, rate = struct.unpack("<HHI", body[:8])
+            bits = struct.unpack("<H", body[14:16])[0]
+            if tag == 0xFFFE and len(body) >= 26:  # WAVE_FORMAT_EXTENSIBLE: alt biçim
+                tag = struct.unpack("<H", body[24:26])[0]
+            fmt = (tag, channels, rate, bits)
+        elif chunk_id == b"data":
+            frames = body
+        pos += 8 + size + (size % 2)
+    if fmt is None:
+        raise ValueError(f"fmt bölümü yok: {path}")
+    tag, channels, rate, bits = fmt
+    if tag == _PCM and bits == 16:
+        data = np.frombuffer(frames, dtype="<i2").astype(np.float32) / 32768.0
+    elif tag == _FLOAT and bits == 32:
+        data = np.frombuffer(frames, dtype="<f4").astype(np.float32)
+    else:
+        raise ValueError(f"Desteklenmeyen WAV biçimi (biçim {tag}, {bits} bit): {path}")
     if channels > 1:
         data = data.reshape(-1, channels).mean(axis=1).astype(np.float32)
     return AudioClip(samples=data, sample_rate=rate)

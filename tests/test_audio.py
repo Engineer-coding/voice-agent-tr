@@ -49,6 +49,21 @@ def test_wav_roundtrip(tmp_path: Path) -> None:
     assert np.max(np.abs(back.samples - clip.samples)) < 1e-3
 
 
+def test_read_float32_wav(tmp_path: Path) -> None:
+    """FLEURS dosyaları 32 bit float WAV'dır; stdlib wave bunları okuyamaz."""
+    import struct
+
+    samples = np.array([0.0, 0.5, -0.5, 0.25], dtype="<f4")
+    data = samples.tobytes()
+    fmt = struct.pack("<HHIIHH", 3, 1, 16_000, 16_000 * 4, 4, 32)
+    body = b"WAVE" + b"fmt " + struct.pack("<I", len(fmt)) + fmt
+    body += b"data" + struct.pack("<I", len(data)) + data
+    (tmp_path / "f.wav").write_bytes(b"RIFF" + struct.pack("<I", len(body)) + body)
+    clip = read_wav(tmp_path / "f.wav")
+    assert clip.sample_rate == 16_000
+    assert np.allclose(clip.samples, samples)
+
+
 def test_resample_changes_rate_and_keeps_duration() -> None:
     clip = _tone(1.0, 22_050)
     out = resample(clip, 16_000)
