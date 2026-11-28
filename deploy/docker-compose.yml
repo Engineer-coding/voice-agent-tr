@@ -9,11 +9,29 @@ services:
       - "8000:8000"
     environment:
       REDIS_URL: redis://redis:6379/0
+      CRM_URL: http://mock-crm:8100
     depends_on:
       redis:
         condition: service_healthy
+      mock-crm:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  mock-crm:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    command: ["uv", "run", "--no-dev", "uvicorn", "mock_crm.app:default_app", "--factory", "--host", "0.0.0.0", "--port", "8100"]
+    ports:
+      - "8100:8100"
+    environment:
+      MOCK_CRM_DB: /data/mock_crm.sqlite3
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/health')"]
       interval: 10s
       timeout: 3s
       retries: 3

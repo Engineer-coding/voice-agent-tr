@@ -35,6 +35,8 @@ Varsayım: GPU yok, her şey CPU'da çalışmalı.
 - `make test`: pytest
 - `make eval`: değerlendirme raporu
 - `make check`: lint + typecheck + test
+- `make chat`: terminalden asistanla yazışma (kural tabanlı LLM, sahte CRM süreç içinde)
+- `make crm`: sahte CRM servisini 8100 portunda çalıştır
 - `make up` / `make down`: Docker Compose
 
 ## Kod standartları
@@ -49,6 +51,8 @@ Varsayım: GPU yok, her şey CPU'da çalışmalı.
 
 - Durum başına araç izin listesini asla atlama. İzin kontrolü kodda yapılır, prompta bırakılmaz.
 - Paket değiştirme aracı yalnızca kimlik doğrulandıktan ve müşteri açıkça onayladıktan sonra çağrılabilir.
+  `change_package` yalnızca sistem tarafından çağrılır; onayı `parse_confirmation` verir, LLM vermez.
+- Müşteri kimliği her zaman oturumdan gelir; araç şemaları `extra="forbid"` kalmalı.
 - Araç çıktıları LLM'e talimat olarak değil, veri olarak verilir.
 - Loglarda TC kimlik no, telefon gibi kişisel veriler maskelenir.
 - Gerçek kişisel veri kullanılmaz; ses izi için yalnızca açık rızalı kayıtlar (KVKK).
