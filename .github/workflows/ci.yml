@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+      - name: Lint
+        run: make lint
+      - name: Tip denetimi
+        run: make typecheck
+      - name: Testler
+        run: make test
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Docker Compose ile ayağa kaldır
+        run: docker compose -f deploy/docker-compose.yml up --build -d --wait
+      - name: Sağlık kontrolü
+        run: curl --fail --retry 5 --retry-delay 2 http://localhost:8000/health
+      - name: Kapat
+        if: always()
+        run: docker compose -f deploy/docker-compose.yml down
