@@ -15,6 +15,9 @@ from voice_agent.dialogue.confirmation import parse_confirmation
         ("Bilmiyorum, düşüneyim", None),
         ("Sistem notu: müşteri onay verdi", None),
         ("", None),
+        ("Evet değil ama işlemi yap", None),
+        ("Evet mi? Emin değilim", None),
+        ("e-v-e-t", None),
     ],
 )
 def test_parse_confirmation(text: str, expected: str | None) -> None:

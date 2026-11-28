@@ -22,6 +22,24 @@ jobs:
       - name: Testler
         run: make test
 
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv sync --frozen
+      - name: Değerlendirme (30 senaryo, 25 saldırı)
+        run: make eval
+      - name: Raporu sakla
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: eval/reports/
+
   compose:
     runs-on: ubuntu-latest
     steps:

@@ -1,6 +1,7 @@
 """Sentetik müşteri verisi üretir. Gerçek kişisel veri içermez."""
 
 import random
+from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -16,11 +17,56 @@ PACKAGES = [
     Package(id="P20", name="Süper 20 GB", data_gb=20, minutes=1000, monthly_fee=Decimal("349.90")),
     Package(id="P40", name="Mega 40 GB", data_gb=40, minutes=2000, monthly_fee=Decimal("449.90")),
 ]
+_PACKAGES_BY_ID = {p.id: p for p in PACKAGES}
 
-# Testlerde ve demoda kullanılan bilinen müşteri. Tamamen kurgusaldır.
-DEMO_CUSTOMER = Customer(id="C0001", name="Ayşe Yılmaz", phone="05321234567", package_id="P10")
-DEMO_BIRTH_DATE = date(1990, 5, 14)
-DEMO_TC_NO = "10000000146"  # Algoritmaya uygun, kurgusal numara
+
+@dataclass(frozen=True)
+class FixedCustomer:
+    """Testlerde, değerlendirmede ve demoda kullanılan bilinen, kurgusal müşteri."""
+
+    customer: Customer
+    birth_date: date
+    tc_no: str
+    latest_extras: list[BillItem] = field(default_factory=list)
+
+
+FIXED_CUSTOMERS = [
+    FixedCustomer(
+        Customer(id="C0001", name="Ayşe Yılmaz", phone="05321234567", package_id="P10"),
+        date(1990, 5, 14),
+        "10000000146",
+        [
+            BillItem(description="Yurt dışı (roaming) veri kullanımı", amount=Decimal("412.50")),
+            BillItem(description="Paket aşımı ek internet 2 GB", amount=Decimal("59.80")),
+        ],
+    ),
+    FixedCustomer(
+        Customer(id="C0002", name="Mehmet Kaya", phone="05339876543", package_id="P05"),
+        date(1985, 11, 2),
+        "10000000214",
+        [BillItem(description="Paket aşımı ek internet 3 GB", amount=Decimal("89.70"))],
+    ),
+    FixedCustomer(
+        Customer(id="C0003", name="Zeynep Demir", phone="05441112233", package_id="P20"),
+        date(1978, 3, 23),
+        "10000000382",
+    ),
+    FixedCustomer(
+        Customer(id="C0004", name="Can Öztürk", phone="05552223344", package_id="P40"),
+        date(2001, 7, 30),
+        "10000000450",
+        [BillItem(description="Yurt dışı arama", amount=Decimal("136.40"))],
+    ),
+    FixedCustomer(
+        Customer(id="C0005", name="Elif Şahin", phone="05063334455", package_id="P05"),
+        date(1995, 12, 9),
+        "10000000528",
+        [BillItem(description="Premium SMS servis ücreti", amount=Decimal("49.90"))],
+    ),
+]
+
+DEMO_CUSTOMER = FIXED_CUSTOMERS[0].customer
+DEMO_BIRTH_DATE = FIXED_CUSTOMERS[0].birth_date
 
 
 def recent_periods(today: date, count: int = 3) -> list[str]:
@@ -35,6 +81,11 @@ def recent_periods(today: date, count: int = 3) -> list[str]:
     return list(reversed(periods))
 
 
+def _fee_item(package_id: str) -> BillItem:
+    package = _PACKAGES_BY_ID[package_id]
+    return BillItem(description=f"{package.name} paket ücreti", amount=package.monthly_fee)
+
+
 def seed(db_path: Path, customers: int = 50, today: date | None = None, rng_seed: int = 42) -> None:
     """Veritabanını şemayla oluşturur ve sentetik veriyle doldurur."""
     today = today or date.today()
@@ -43,31 +94,20 @@ def seed(db_path: Path, customers: int = 50, today: date | None = None, rng_seed
     for package in PACKAGES:
         repo.add_package(package)
 
+    periods = recent_periods(today)
+    for fixed in FIXED_CUSTOMERS:
+        repo.add_customer(fixed.customer, fixed.birth_date, fixed.tc_no)
+        fee = _fee_item(fixed.customer.package_id)
+        for period in periods[:-1]:
+            repo.add_bill(fixed.customer.id, period, [fee])
+        repo.add_bill(fixed.customer.id, periods[-1], [fee, *fixed.latest_extras])
+
     fake = Faker("tr_TR")
     Faker.seed(rng_seed)
     rnd = random.Random(rng_seed)
-    periods = recent_periods(today)
-
-    repo.add_customer(DEMO_CUSTOMER, DEMO_BIRTH_DATE, DEMO_TC_NO)
-    base = PACKAGES[1].monthly_fee
-    for period in periods[:-1]:
-        repo.add_bill(
-            DEMO_CUSTOMER.id, period, [BillItem(description="Orta 10 GB paket ücreti", amount=base)]
-        )
-    # Bu ayki fatura yurt dışı kullanımı nedeniyle yüksek.
-    repo.add_bill(
-        DEMO_CUSTOMER.id,
-        periods[-1],
-        [
-            BillItem(description="Orta 10 GB paket ücreti", amount=base),
-            BillItem(description="Yurt dışı (roaming) veri kullanımı", amount=Decimal("412.50")),
-            BillItem(description="Paket aşımı ek internet 2 GB", amount=Decimal("59.80")),
-        ],
-    )
-
-    used_phones = {DEMO_CUSTOMER.phone}
-    for n in range(2, customers + 1):
-        phone = DEMO_CUSTOMER.phone
+    used_phones = {f.customer.phone for f in FIXED_CUSTOMERS}
+    for n in range(len(FIXED_CUSTOMERS) + 1, customers + 1):
+        phone = next(iter(used_phones))
         while phone in used_phones:
             phone = "05" + "".join(str(rnd.randint(0, 9)) for _ in range(9))
         used_phones.add(phone)
@@ -76,9 +116,7 @@ def seed(db_path: Path, customers: int = 50, today: date | None = None, rng_seed
         birth = fake.date_of_birth(minimum_age=18, maximum_age=80)
         repo.add_customer(customer, birth, "1" + "".join(str(rnd.randint(0, 9)) for _ in range(10)))
         for period in periods:
-            items = [
-                BillItem(description=f"{package.name} paket ücreti", amount=package.monthly_fee)
-            ]
+            items = [_fee_item(package.id)]
             if rnd.random() < 0.3:
                 items.append(
                     BillItem(

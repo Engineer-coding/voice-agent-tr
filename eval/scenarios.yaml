@@ -1,0 +1,463 @@
+# 30 diyalog senaryosu. Müşteriler services/mock_crm/seed.py içindeki sabit, kurgusal müşterilerdir.
+# Değerlendirme tarihi 2026-11-15 olarak sabitlenir; son fatura dönemi Kasım 2026'dır.
+#
+# Müşteriler:
+#   C0001 Ayşe Yılmaz   0532 123 45 67  14.05.1990  P10  fatura 752,20 (roaming + aşım)
+#   C0002 Mehmet Kaya   0533 987 65 43  02.11.1985  P05  fatura 289,60 (aşım)
+#   C0003 Zeynep Demir  0544 111 22 33  23.03.1978  P20  fatura 349,90
+#   C0004 Can Öztürk    0555 222 33 44  30.07.2001  P40  fatura 586,30 (yurt dışı arama)
+#   C0005 Elif Şahin    0506 333 44 55  09.12.1995  P05  fatura 249,80 (premium SMS)
+
+# ---------------------------------------------------------------- Fatura (8)
+- id: fatura-01-yuksek-fatura
+  category: billing
+  goal: Bu ayki faturanın neden yüksek olduğunu öğrenmek
+  customer: C0001
+  turns:
+    - "Numaram 0532 123 45 67, doğum tarihim 14.05.1990"
+    - "Bu ayki faturam neden yüksek?"
+  expect:
+    tool_calls:
+      - {name: verify_identity, arguments: {phone: "05321234567", birth_date: "1990-05-14"}}
+      - {name: get_bill}
+    reply_contains: ["752,20 TL", "roaming"]
+
+- id: fatura-02-tutar-ay-adi
+  category: billing
+  goal: Fatura tutarını öğrenmek (doğum tarihi ay adıyla)
+  customer: C0002
+  turns:
+    - "05339876543, 2 Kasım 1985"
+    - "Faturam ne kadar?"
+  expect:
+    tool_calls:
+      - {name: verify_identity, arguments: {birth_date: "1985-11-02"}}
+      - {name: get_bill}
+    reply_contains: ["289,60 TL", "Paket aşımı"]
+
+- id: fatura-03-bosluklu-numara
+  category: billing
+  goal: Son faturayı öğrenmek
+  customer: C0003
+  turns:
+    - "Telefonum 0544 111 22 33, 23/03/1978 doğumluyum"
+    - "Son faturamı öğrenmek istiyorum"
+  expect:
+    tool_calls:
+      - {name: verify_identity, arguments: {phone: "05441112233"}}
+      - {name: get_bill}
+    reply_contains: ["349,90 TL"]
+
+- id: fatura-04-yurt-disi-arama
+  category: billing
+  goal: Faturadaki yurt dışı arama kalemini sormak
+  customer: C0004
+  turns:
+    - "0555 222 33 44, doğum tarihim 30.07.2001"
+    - "Faturamda yurt dışı arama görünüyor, neden?"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: get_bill}
+    reply_contains: ["586,30 TL", "Yurt dışı arama"]
+
+- id: fatura-05-bilinmeyen-ucret
+  category: billing
+  goal: Faturaya yansıyan tanımadığı ücreti sormak
+  customer: C0005
+  turns:
+    - "Numaram 0506 333 44 55, 9 Aralık 1995"
+    - "Faturama bilmediğim bir ücret yansımış"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: get_bill}
+    reply_contains: ["249,80 TL", "Premium SMS"]
+
+- id: fatura-06-bilgiyi-parca-parca-verme
+  category: billing
+  goal: Kimlik bilgisini iki turda verip fatura borcunu öğrenmek
+  customer: C0001
+  turns:
+    - "Numaram 05321234567"
+    - "14.05.1990"
+    - "Fatura borcum ne kadar?"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: get_bill}
+    reply_contains: ["Doğum tarihinizi", "752,20 TL"]
+
+- id: fatura-07-yanlis-dogum-tarihi
+  category: billing
+  goal: İlk denemede yanlış doğum tarihi verip sonra düzeltmek
+  customer: C0002
+  turns:
+    - "05339876543, 03.11.1985"
+    - "Pardon, 02.11.1985 olacak, numara 05339876543"
+    - "Faturamı öğrenebilir miyim?"
+  expect:
+    tool_calls:
+      - {name: verify_identity, arguments: {birth_date: "1985-11-03"}}
+      - {name: verify_identity, arguments: {birth_date: "1985-11-02"}}
+      - {name: get_bill}
+    reply_contains: ["eşleşmedi", "289,60 TL"]
+
+- id: fatura-08-odeme-tutari
+  category: billing
+  goal: Ödemesi gereken tutarı sormak
+  customer: C0003
+  turns:
+    - "0544 111 22 33 ve 23.03.1978"
+    - "Ödeme yapmam gereken tutar ne kadar?"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: get_bill}
+    reply_contains: ["349,90 TL"]
+
+# ---------------------------------------------------------------- Paket değişikliği (8)
+- id: paket-01-daha-fazla-internet
+  category: package_change
+  goal: Daha fazla internet için 20 GB pakete geçmek
+  customer: C0001
+  turns:
+    - "0532 123 45 67, 14.05.1990"
+    - "Daha fazla internet istiyorum"
+    - "20 GB olanı istiyorum"
+    - "Evet"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: list_packages}
+      - {name: select_package, arguments: {package_id: P20}}
+      - {name: change_package, arguments: {package_id: P20}}
+    final_phase: closing
+    crm: {customer_id: C0001, package_id: P20}
+
+- id: paket-02-isimle-secim
+  category: package_change
+  goal: Paketi adıyla seçerek Orta 10 GB'a geçmek
+  customer: C0002
+  turns:
+    - "05339876543, 02.11.1985"
+    - "Paketimi değiştirmek istiyorum"
+    - "Orta 10 GB olsun"
+    - "Onaylıyorum"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: list_packages}
+      - {name: select_package, arguments: {package_id: P10}}
+      - {name: change_package, arguments: {package_id: P10}}
+    crm: {customer_id: C0002, package_id: P10}
+
+- id: paket-03-tarife-yukseltme
+  category: package_change
+  goal: Tarifeyi 40 GB'a yükseltmek
+  customer: C0003
+  turns:
+    - "0544 111 22 33, 23.03.1978"
+    - "Tarifemi yükseltmek istiyorum"
+    - "40 GB"
+    - "Evet, onaylıyorum"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: list_packages}
+      - {name: select_package, arguments: {package_id: P40}}
+      - {name: change_package, arguments: {package_id: P40}}
+    crm: {customer_id: C0003, package_id: P40}
+
+- id: paket-04-reddetme
+  category: package_change
+  goal: Paket düşürmeyi düşünüp onay aşamasında vazgeçmek
+  customer: C0004
+  turns:
+    - "0555 222 33 44, 30.07.2001"
+    - "Paketimi düşürmek istiyorum"
+    - "5 GB olan"
+    - "Hayır, vazgeçtim"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: list_packages}
+      - {name: select_package, arguments: {package_id: P05}}
+    crm: {customer_id: C0004, package_id: P40}
+
+- id: paket-05-belirsiz-onay
+  category: package_change
+  goal: Onay sorusuna önce belirsiz sonra açık cevap vermek
+  customer: C0005
+  turns:
+    - "0506 333 44 55, 09.12.1995"
+    - "Daha fazla GB istiyorum"
+    - "20 GB"
+    - "Hmm, bilmiyorum"
+    - "Evet"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: list_packages}
+      - {name: select_package, arguments: {package_id: P20}}
+      - {name: change_package, arguments: {package_id: P20}}
+    reply_contains: ["evet ya da hayır"]
+    crm: {customer_id: C0005, package_id: P20}
+
+- id: paket-06-mevcut-paketi-secme
+  category: package_change
+  goal: Yanlışlıkla mevcut paketini seçip sonra 40 GB'a geçmek
+  customer: C0001
+  turns:
+    - "0532 123 45 67, 14.05.1990"
+    - "Paket değiştirmek istiyorum"
+    - "10 GB"
+    - "O zaman 40 GB"
+    - "Evet"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: list_packages}
+      - {name: select_package, arguments: {package_id: P10}}
+      - {name: select_package, arguments: {package_id: P40}}
+      - {name: change_package, arguments: {package_id: P40}}
+    reply_contains: ["Zaten bu paketi"]
+    crm: {customer_id: C0001, package_id: P40}
+
+- id: paket-07-sonra-fatura
+  category: package_change
+  goal: Paket değiştirdikten sonra faturayı sormak
+  customer: C0002
+  turns:
+    - "05339876543, 02.11.1985"
+    - "Daha fazla internet istiyorum"
+    - "20 GB"
+    - "Evet"
+    - "Bir de faturam ne kadar?"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: list_packages}
+      - {name: select_package, arguments: {package_id: P20}}
+      - {name: change_package, arguments: {package_id: P20}}
+      - {name: get_bill}
+    crm: {customer_id: C0002, package_id: P20}
+
+- id: paket-08-kimlikten-once-istek
+  category: package_change
+  goal: Kimlik doğrulamadan paket değiştirmek isteyip sonra doğrulamak
+  customer: C0003
+  turns:
+    - "Paketimi değiştirmek istiyorum"
+    - "0544 111 22 33, 23.03.1978"
+    - "Daha fazla internet istiyorum"
+    - "40 GB"
+    - "Evet"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: list_packages}
+      - {name: select_package, arguments: {package_id: P40}}
+      - {name: change_package, arguments: {package_id: P40}}
+    crm: {customer_id: C0003, package_id: P40}
+
+# ---------------------------------------------------------------- Arıza kaydı (8)
+- id: ariza-01-modem-isik
+  category: fault_report
+  goal: Modem ışık yakmıyor arızası bildirmek
+  customer: C0001
+  turns:
+    - "0532 123 45 67, 14.05.1990"
+    - "Modemim ışık yakmıyor"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: create_fault_ticket, arguments: {category: modem, description: "Modemim ışık yakmıyor"}}
+    final_phase: closing
+    reply_contains: ["ARZ-"]
+    crm: {customer_id: C0001, ticket_count: 1, ticket_category: modem}
+
+- id: ariza-02-yavas-internet
+  category: fault_report
+  goal: İnternet yavaşlığı bildirmek
+  customer: C0002
+  turns:
+    - "05339876543, 02.11.1985"
+    - "İnternetim çok yavaş"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: create_fault_ticket, arguments: {category: hiz}}
+    crm: {customer_id: C0002, ticket_count: 1, ticket_category: hiz}
+
+- id: ariza-03-baglanamiyorum
+  category: fault_report
+  goal: İnternete bağlanamama sorunu bildirmek
+  customer: C0003
+  turns:
+    - "0544 111 22 33, 23.03.1978"
+    - "Evde internete bağlanamıyorum"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: create_fault_ticket, arguments: {category: baglanti}}
+    crm: {customer_id: C0003, ticket_count: 1, ticket_category: baglanti}
+
+- id: ariza-04-sebeke
+  category: fault_report
+  goal: Mobil şebeke sorunu için arıza kaydı açmak
+  customer: C0004
+  turns:
+    - "0555 222 33 44, 30.07.2001"
+    - "Telefonum şebeke çekmiyor, arıza kaydı açmak istiyorum"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: create_fault_ticket, arguments: {category: mobil_sebeke}}
+    crm: {customer_id: C0004, ticket_count: 1, ticket_category: mobil_sebeke}
+
+- id: ariza-05-kesik-baglanti
+  category: fault_report
+  goal: Kesik kesik bağlantıyı bildirmek
+  customer: C0005
+  turns:
+    - "0506 333 44 55, 09.12.1995"
+    - "Bağlantım sürekli kesik kesik"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: create_fault_ticket, arguments: {category: baglanti}}
+    crm: {customer_id: C0005, ticket_count: 1, ticket_category: baglanti}
+
+- id: ariza-06-once-genel-istek
+  category: fault_report
+  goal: Önce genel bir arıza isteği söyleyip sonra sorunu anlatmak
+  customer: C0001
+  turns:
+    - "0532 123 45 67, 14.05.1990"
+    - "Arıza kaydı açtırmak istiyorum"
+    - "Modem ışıkları yanıp sönüyor"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: create_fault_ticket, arguments: {category: modem, description: "Modem ışıkları yanıp sönüyor"}}
+    reply_contains: ["sorunu biraz anlatır"]
+    crm: {customer_id: C0001, ticket_count: 1, ticket_category: modem}
+
+- id: ariza-07-sonra-fatura
+  category: fault_report
+  goal: Arıza bildirdikten sonra faturayı sormak
+  customer: C0002
+  turns:
+    - "05339876543, 02.11.1985"
+    - "Modemim çalışmıyor"
+    - "Bir de faturamı öğrenebilir miyim?"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: create_fault_ticket, arguments: {category: modem}}
+      - {name: get_bill}
+    reply_contains: ["ARZ-", "289,60 TL"]
+    crm: {customer_id: C0002, ticket_count: 1}
+
+- id: ariza-08-diger-kategori
+  category: fault_report
+  goal: Sınıflandırılamayan bir arızayı bildirmek
+  customer: C0003
+  turns:
+    - "0544 111 22 33, 23.03.1978"
+    - "Ev telefonu hattımda arıza var, sürekli cızırtı geliyor"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: create_fault_ticket, arguments: {category: diger}}
+    crm: {customer_id: C0003, ticket_count: 1, ticket_category: diger}
+
+# ---------------------------------------------------------------- Zor vakalar (6)
+- id: zor-01-uc-yanlis-kimlik
+  category: edge_case
+  goal: Üç kez yanlış kimlik bilgisi verip temsilciye aktarılmak
+  customer: C0001
+  turns:
+    - "05321234567, 01.01.2000"
+    - "05321234567, 02.01.2000"
+    - "05321234567, 03.01.2000"
+    - "Faturam ne kadar?"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: verify_identity}
+      - {name: verify_identity}
+    final_phase: handoff
+    reply_contains: ["temsilcisine aktarıyorum"]
+
+- id: zor-02-hemen-temsilci
+  category: edge_case
+  goal: Doğrudan temsilciyle görüşmek istemek
+  customer: C0002
+  turns:
+    - "Temsilciye bağlar mısınız?"
+  expect:
+    tool_calls:
+      - {name: transfer_to_agent}
+    final_phase: handoff
+
+- id: zor-03-dogrulamadan-sonra-temsilci
+  category: edge_case
+  goal: Kimlik doğrulandıktan sonra yetkili biriyle görüşmek istemek
+  customer: C0004
+  turns:
+    - "0555 222 33 44, 30.07.2001"
+    - "Bir yetkiliyle görüşmek istiyorum"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: transfer_to_agent}
+    final_phase: handoff
+
+- id: zor-04-konu-degistirme
+  category: edge_case
+  goal: Paket konuşurken arızaya geçmek
+  customer: C0001
+  turns:
+    - "0532 123 45 67, 14.05.1990"
+    - "Daha fazla internet istiyorum"
+    - "Aslında modemim de ışık yakmıyor"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: list_packages}
+      - {name: create_fault_ticket, arguments: {category: modem}}
+    crm: {customer_id: C0001, package_id: P10, ticket_count: 1}
+
+- id: zor-05-kapsam-disi
+  category: edge_case
+  goal: Kapsam dışı bir soru sormak
+  customer: C0005
+  turns:
+    - "0506 333 44 55, 09.12.1995"
+    - "Yarın hava nasıl olacak?"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+    reply_contains: ["yardımcı olabilirim"]
+
+- id: zor-06-onay-sirasinda-fatura
+  category: edge_case
+  goal: Onay aşamasında başka konu açıp sonra vazgeçmek ve faturayı sormak
+  customer: C0003
+  turns:
+    - "0544 111 22 33, 23.03.1978"
+    - "Daha fazla internet istiyorum"
+    - "40 GB"
+    - "Faturam ne kadar?"
+    - "Hayır"
+    - "Faturam ne kadar?"
+  expect:
+    tool_calls:
+      - {name: verify_identity}
+      - {name: list_packages}
+      - {name: select_package, arguments: {package_id: P40}}
+      - {name: get_bill}
+    reply_contains: ["evet ya da hayır", "349,90 TL"]
+    crm: {customer_id: C0003, package_id: P20}

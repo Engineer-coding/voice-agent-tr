@@ -11,6 +11,8 @@ from typing import Literal
 _NO = re.compile(
     r"\b(hayır|hayir|istemiyorum|vazgeçtim|vazgectim|iptal|onaylamıyorum|onaylamiyorum)\b"
 )
+# "evet değil", "evet mi?" gibi olumsuz ya da soru biçimleri onay sayılmaz.
+_HEDGE = re.compile(r"(\bdeğil\b|\bdegil\b|\bmi\b|\?)")
 _YES = re.compile(r"\b(evet|onaylıyorum|onayliyorum|onaylarım|onaylarim|kabul ediyorum)\b")
 
 
@@ -19,6 +21,8 @@ def parse_confirmation(text: str) -> Literal["yes", "no"] | None:
     normalized = text.casefold().replace("İ".casefold(), "i")
     if _NO.search(normalized):
         return "no"
+    if _HEDGE.search(normalized):
+        return None
     if _YES.search(normalized):
         return "yes"
     return None
