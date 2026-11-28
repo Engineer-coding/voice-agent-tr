@@ -179,12 +179,12 @@ def to_markdown(results: list[ModelResult], e2e: list[dict[str, object]], e2e_mo
         "",
         f"## Dosya tabanlı uçtan uca hat ({e2e_model})",
         "",
-        "| Müşteri | STT çıktısı | STT (sn) | Agent (sn) | TTS ilk cümle (sn) | İlk ses (sn) |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| Müşteri (sentetik ses) | STT çıktısı | Asistan | STT (sn) | Agent (sn) | TTS ilk cümle (sn) | İlk ses (sn) |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in e2e:
         lines.append(
-            f"| {row['musteri']} | {row['stt']} | {row['stt_s']} | {row['agent_s']} | "
+            f"| {row['musteri']} | {row['stt']} | {row['asistan']} | {row['stt_s']} | {row['agent_s']} | "
             f"{row['tts_first_sentence_s']} | {row['ilk_ses_s']} |"
         )
     lines += [
@@ -199,7 +199,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--samples", type=int, default=100)
     parser.add_argument("--models", nargs="+", default=["tiny", "base", "small", "medium"])
-    parser.add_argument("--e2e-model", default="small")
+    parser.add_argument("--e2e-model", default="large-v3-turbo")
     parser.add_argument("--out", type=Path, default=Path("eval/reports/bench"))
     args = parser.parse_args(argv)
     args.out.mkdir(parents=True, exist_ok=True)

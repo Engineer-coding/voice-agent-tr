@@ -11,6 +11,9 @@ on:
       models:
         description: Boşlukla ayrılmış Whisper boyutları
         default: "tiny base small medium large-v3-turbo"
+      e2e_model:
+        description: Uçtan uca hatta kullanılacak model
+        default: "large-v3-turbo"
   push:
     paths:
       - "src/voice_agent/audio/**"
@@ -39,10 +42,11 @@ jobs:
         env:
           SAMPLES: ${{ github.event.inputs.samples || '100' }}
           MODELS: ${{ github.event.inputs.models || 'tiny base small medium large-v3-turbo' }}
+          E2E_MODEL: ${{ github.event.inputs.e2e_model || 'large-v3-turbo' }}
         run: |
           nproc
           uv run --extra audio python -m voice_agent.evaluation.stt_benchmark \
-            --samples "$SAMPLES" --models $MODELS --out eval/reports/bench
+            --samples "$SAMPLES" --models $MODELS --e2e-model "$E2E_MODEL" --out eval/reports/bench
           cat eval/reports/bench/benchmarks.md >> "$GITHUB_STEP_SUMMARY"
       - name: Sonuçları sakla
         if: always()
