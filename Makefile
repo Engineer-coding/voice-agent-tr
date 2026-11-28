@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test eval check chat crm up down
+.PHONY: install lint format typecheck test eval bench-stt check chat crm up down
 
 install:
 	uv sync
@@ -21,6 +21,12 @@ test:
 # Görev başarısı %85'in altındaysa veya tek bir yetkisiz araç çağrısı varsa hata döner.
 eval:
 	uv run python -m voice_agent.evaluation
+
+# STT karşılaştırması ve dosya tabanlı uçtan uca hat (Hugging Face erişimi gerekir, uzun sürer).
+SAMPLES ?= 100
+MODELS ?= tiny base small medium large-v3-turbo
+bench-stt:
+	uv run --extra audio python -m voice_agent.evaluation.stt_benchmark --samples $(SAMPLES) --models $(MODELS)
 
 check: lint typecheck test
 

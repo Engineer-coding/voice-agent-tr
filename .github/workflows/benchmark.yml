@@ -1,0 +1,56 @@
+name: STT benchmark
+
+# Uzun süren ölçüm: Whisper modellerini FLEURS Türkçe üzerinde karşılaştırır ve dosya tabanlı
+# uçtan uca hattı çalıştırır. Ses kodu değiştiğinde veya elle tetiklendiğinde çalışır.
+on:
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: FLEURS cümle sayısı
+        default: "100"
+      models:
+        description: Boşlukla ayrılmış Whisper boyutları
+        default: "tiny base small medium large-v3-turbo"
+      e2e_model:
+        description: Uçtan uca hatta kullanılacak model
+        default: "small"
+  push:
+    paths:
+      - "src/voice_agent/audio/**"
+      - "src/voice_agent/evaluation/stt_benchmark.py"
+      - "eval/telecom_sentences.txt"
+      - ".github/workflows/benchmark.yml"
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv python install 3.12
+      - run: uv sync --frozen --extra audio
+      - name: Hugging Face önbelleği
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ hashFiles('src/voice_agent/evaluation/stt_benchmark.py', 'src/voice_agent/audio/tts.py') }}
+          restore-keys: hf-
+      - name: Ölçüm
+        env:
+          SAMPLES: ${{ github.event.inputs.samples || '100' }}
+          MODELS: ${{ github.event.inputs.models || 'tiny base small medium large-v3-turbo' }}
+          E2E_MODEL: ${{ github.event.inputs.e2e_model || 'small' }}
+        run: |
+          nproc
+          uv run --extra audio python -m voice_agent.evaluation.stt_benchmark \
+            --samples "$SAMPLES" --models $MODELS --e2e-model "$E2E_MODEL" --out eval/reports/bench
+          cat eval/reports/bench/benchmarks.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Sonuçları sakla
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stt-benchmark
+          path: eval/reports/bench/

@@ -2,7 +2,7 @@
 
 Telekom müşteri hizmetleri için Türkçe, gerçek zamanlı, araya girilebilen ve araç kullanan sesli asistan.
 
-> Durum: Aşama 2 (değerlendirme altyapısı). Ayrıntılı plan ve kurallar için [CLAUDE.md](CLAUDE.md).
+> Durum: Aşama 3 (dosya tabanlı ses hattı ve STT ölçümü). Ayrıntılı plan ve kurallar için [CLAUDE.md](CLAUDE.md).
 
 ## Hızlı başlangıç
 
@@ -42,7 +42,7 @@ uv run pre-commit install
 | Görev başarısı (30 senaryo) | ≥ %85 |
 | Araya girme tepkisi | < 300 ms |
 | Injection direnci (25 saldırı) | %100 engellenir |
-| STT hatası (WER, FLEURS Türkçe) | Ölçülüp iyileştirilecek |
+| STT hatası (WER, FLEURS Türkçe) | `small`: %17,3 ([ölçümler](docs/benchmarks.md)) |
 
 ## Değerlendirme
 
@@ -60,6 +60,17 @@ Güncel sonuçlar (kural tabanlı LLM, henüz gerçek model bağlı değil):
 | Görev başarısı | 30/30 |
 | Injection direnci (normal / ele geçirilmiş LLM) | 25/25 / 25/25 |
 | Yetkisiz araç çağrısı | 0 |
+
+## Ses hattı
+
+Dosya tabanlı hat: WAV → faster-whisper (CPU, int8) → diyalog yöneticisi → Piper TTS (cümle cümle).
+Varsayılan STT modeli `small`; `large-v3-turbo` daha doğru ama kısa bir yanıtta 4 çekirdekte
+~6 sn sürüyor ([ADR 0004](docs/adr/0004-stt-modeli-secimi.md), [ölçümler](docs/benchmarks.md)).
+
+```bash
+uv sync --extra audio   # faster-whisper, Piper
+make bench-stt          # model karşılaştırması + uçtan uca hat (uzun sürer; CI'da da çalışır)
+```
 
 ## KVKK notu
 
