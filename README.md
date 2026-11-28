@@ -2,7 +2,7 @@
 
 Telekom müşteri hizmetleri için Türkçe, gerçek zamanlı, araya girilebilen ve araç kullanan sesli asistan.
 
-> Durum: Aşama 0 (proje iskeleti). Ayrıntılı plan ve kurallar için [CLAUDE.md](CLAUDE.md).
+> Durum: Aşama 1 (metin tabanlı agent). Ayrıntılı plan ve kurallar için [CLAUDE.md](CLAUDE.md).
 
 ## Hızlı başlangıç
 
@@ -11,9 +11,22 @@ Gereksinimler: [uv](https://docs.astral.sh/uv/), Docker.
 ```bash
 make install      # bağımlılıklar
 make check        # lint + tip denetimi + testler
-make up           # Docker Compose ile ağ geçidi + Redis
+make chat         # terminalden asistanla yazış (API anahtarı gerekmez)
+make up           # Docker Compose ile ağ geçidi + sahte CRM + Redis
 curl localhost:8000/health
 ```
+
+Demo müşteri (kurgusal): telefon `0532 123 45 67`, doğum tarihi `14.05.1990`.
+
+## Diyalog yöneticisi
+
+LangGraph üzerinde bir durum makinesi: karşılama → kimlik doğrulama → niyet →
+fatura / paket değişikliği → onay / arıza kaydı → kapanış veya temsilciye devir.
+
+- Her aşamada LLM yalnızca o aşamaya izinli araçları görür; izin kontrolü kodda yapılır
+  ([ADR 0002](docs/adr/0002-durum-makinesi-ve-arac-izinleri.md)).
+- Paket değişikliğini LLM değil sistem yapar ve yalnızca müşterinin açık "evet" cevabından sonra.
+- Testler betikli sahte bir LLM ile kötü niyetli araç çağrılarının engellendiğini kanıtlar.
 
 Geliştirme için pre-commit kancalarını kurun:
 
