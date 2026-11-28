@@ -5,43 +5,15 @@ from pathlib import Path
 
 import numpy as np
 
-from voice_agent.audio.io import AudioClip, concat, read_wav, resample, write_wav
+from tests.fakes import FakeSTT, FakeTTS, tone
+from voice_agent.audio.io import concat, read_wav, resample, write_wav
 from voice_agent.audio.pipeline import FilePipeline
-from voice_agent.audio.stt import Transcription
 from voice_agent.audio.tts import split_sentences, synthesize_by_sentence
 from voice_agent.dialogue.agent import DialogueAgent
 
 
-def _tone(seconds: float, rate: int = 22_050) -> AudioClip:
-    t = np.arange(int(seconds * rate)) / rate
-    return AudioClip((0.3 * np.sin(2 * np.pi * 440 * t)).astype(np.float32), rate)
-
-
-class FakeTTS:
-    name = "fake-tts"
-
-    def __init__(self) -> None:
-        self.calls: list[str] = []
-
-    def synthesize(self, text: str) -> AudioClip:
-        self.calls.append(text)
-        return _tone(0.05 * len(text.split()))
-
-
-class FakeSTT:
-    """Ses süresine bakmadan sırayla önceden verilen metinleri döndürür."""
-
-    name = "fake-stt"
-
-    def __init__(self, texts: list[str]) -> None:
-        self.texts = list(texts)
-
-    def transcribe(self, clip: AudioClip) -> Transcription:
-        return Transcription(text=self.texts.pop(0), audio_s=clip.duration_s, processing_s=0.01)
-
-
 def test_wav_roundtrip(tmp_path: Path) -> None:
-    clip = _tone(0.5, 16_000)
+    clip = tone(0.5, 16_000)
     write_wav(tmp_path / "a.wav", clip)
     back = read_wav(tmp_path / "a.wav")
     assert back.sample_rate == 16_000
@@ -65,14 +37,14 @@ def test_read_float32_wav(tmp_path: Path) -> None:
 
 
 def test_resample_changes_rate_and_keeps_duration() -> None:
-    clip = _tone(1.0, 22_050)
+    clip = tone(1.0, 22_050)
     out = resample(clip, 16_000)
     assert out.sample_rate == 16_000
     assert abs(out.duration_s - 1.0) < 1e-3
 
 
 def test_concat_adds_gaps() -> None:
-    a, b = _tone(0.2, 16_000), _tone(0.3, 16_000)
+    a, b = tone(0.2, 16_000), tone(0.3, 16_000)
     joined = concat([a, b], gap_s=0.1)
     assert abs(joined.duration_s - 0.6) < 1e-3
 
@@ -99,7 +71,7 @@ def test_file_pipeline_end_to_end(tmp_path: Path, make_agent: Callable[..., Dial
     stt = FakeSTT(["0532 123 45 67, 14.05.1990", "Bu ayki faturam neden yüksek?"])
     pipeline = FilePipeline(stt, agent, FakeTTS())
     turn_in = tmp_path / "in.wav"
-    write_wav(turn_in, _tone(1.0, 16_000))
+    write_wav(turn_in, tone(1.0, 16_000))
 
     first = pipeline.process(turn_in, tmp_path / "out1.wav")
     assert "doğrulandı" in first.reply

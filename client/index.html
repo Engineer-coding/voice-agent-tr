@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sesli Asistan</title>
+  <style>
+    :root {
+      --bg: #f6f7f9; --panel: #ffffff; --text: #1c2330; --muted: #677085; --line: #e3e6ec;
+      --accent: #2456d6; --accent-text: #ffffff; --user: #e8eefc; --bot: #f1f2f5;
+      --ok: #1f8a4c; --warn: #b26a00; --err: #c0392b;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #12151b; --panel: #1a1e26; --text: #e6e9ef; --muted: #98a1b3; --line: #2a303b;
+        --accent: #5b86f0; --accent-text: #0d1220; --user: #22304f; --bot: #232833;
+        --ok: #4cc47f; --warn: #e0a040; --err: #ef6b5b;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 760px; margin: 0 auto; padding: 24px 16px 40px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    h1 { font-size: 1.25rem; margin: 0; }
+    .status { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: .95rem; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+    .dot.listening { background: var(--ok); }
+    .dot.speech { background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 30%, transparent); }
+    .dot.busy { background: var(--warn); }
+    .dot.error { background: var(--err); }
+    .hint { color: var(--muted); font-size: .9rem; margin: 8px 0 16px; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+    #log { height: 46vh; min-height: 260px; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .msg { max-width: 85%; padding: 8px 12px; border-radius: 12px; white-space: pre-wrap; }
+    .msg.user { align-self: flex-end; background: var(--user); }
+    .msg.bot { align-self: flex-start; background: var(--bot); }
+    .msg.sys { align-self: center; color: var(--muted); font-size: .85rem; }
+    .msg small { display: block; color: var(--muted); font-size: .75rem; }
+    .controls { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    button, input { font: inherit; border-radius: 8px; }
+    button { border: 0; padding: 10px 16px; background: var(--accent); color: var(--accent-text); cursor: pointer; }
+    button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+    button:disabled { opacity: .5; cursor: default; }
+    form { display: flex; gap: 8px; flex: 1 1 320px; }
+    input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+    h2 { font-size: 1rem; margin: 24px 0 8px; }
+    table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+    th:first-child, td:first-child { text-align: left; }
+    th { color: var(--muted); font-weight: 500; font-size: .85rem; }
+    .demo { color: var(--muted); font-size: .85rem; margin-top: 16px; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Müşteri hizmetleri sesli asistanı</h1>
+    <span class="status"><span id="dot" class="dot"></span><span id="status">Bağlı değil</span></span>
+  </header>
+  <p class="hint">Başlat'a basıp mikrofona izin verin, sonra konuşun. Asistan konuşurken mikrofon dinlenmez.</p>
+
+  <section class="panel" id="log" aria-live="polite"></section>
+
+  <div class="controls">
+    <button id="start">Başlat</button>
+    <button id="stop" class="secondary" disabled>Bitir</button>
+    <form id="typed">
+      <input id="text" placeholder="Yazarak yanıt verin (ör. telefon numarası)" autocomplete="off" disabled>
+      <button id="send" class="secondary" disabled>Gönder</button>
+    </form>
+  </div>
+
+  <h2>Son turların gecikmesi (saniye)</h2>
+  <div class="panel">
+    <table>
+      <thead><tr><th>Tur</th><th>VAD</th><th>STT</th><th>LLM</th><th>TTS ilk</th><th>İlk ses</th></tr></thead>
+      <tbody id="timings"></tbody>
+    </table>
+  </div>
+  <p class="demo">Demo müşteri (kurgusal): telefon 0532 123 45 67, doğum tarihi 14 Mayıs 1990.</p>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

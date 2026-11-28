@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: voice-agent
+    folder: voice-agent-tr
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

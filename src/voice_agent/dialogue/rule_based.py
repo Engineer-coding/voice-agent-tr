@@ -63,19 +63,34 @@ def find_phone(text: str) -> str | None:
 
 
 def find_birth_date(text: str) -> date | None:
-    match = re.search(r"\b(\d{1,2})[./-](\d{1,2})[./-](\d{4})\b", text)
-    if match:
+    # STT tarihleri "14.05.1990", "14 05 1990" veya "14 Mayıs 1990" biçiminde yazabilir.
+    for match in re.finditer(r"\b(\d{1,2})[./\-\s](\d{1,2})[./\-\s](\d{4})\b", text):
         day, month, year = (int(g) for g in match.groups())
-    else:
-        lowered = _lower(text)
-        named = re.search(r"\b(\d{1,2})\s+([a-zçğıöşü]+)\s+(\d{4})\b", lowered)
-        if not named or named.group(2) not in MONTHS:
-            return None
-        day, month, year = int(named.group(1)), MONTHS[named.group(2)], int(named.group(3))
+        if (found := _valid_date(year, month, day)) is not None:
+            return found
+    lowered = _lower(text)
+    for named in re.finditer(r"\b(\d{1,2})\s+([a-zçğıöşü]+)\s+(\d{4})\b", lowered):
+        if named.group(2) in MONTHS:
+            day, month, year = int(named.group(1)), MONTHS[named.group(2)], int(named.group(3))
+            if (found := _valid_date(year, month, day)) is not None:
+                return found
+    return None
+
+
+def _valid_date(year: int, month: int, day: int) -> date | None:
     try:
         return date(year, month, day)
     except ValueError:
         return None
+
+
+def format_phone(phone: str) -> str:
+    """05321234567 → "0532 123 45 67" (TTS'in grup grup okuması için)."""
+    return f"{phone[:4]} {phone[4:7]} {phone[7:9]} {phone[9:]}"
+
+
+def format_date(value: date) -> str:
+    return f"{value.day} {MONTH_NAMES[value.month]} {value.year}"
 
 
 def detect_intent(text: str) -> Intent | None:
@@ -98,13 +113,30 @@ def _last_tool_data(request: LLMRequest, name: ToolName) -> dict[str, Any] | Non
     return None
 
 
+def _identity_texts(messages: list[Message]) -> list[str]:
+    """Son doğrulama denemesinden bu yana müşterinin söyledikleri (eskiden yeniye)."""
+    texts: list[str] = []
+    for message in reversed(messages):
+        if message.role == "tool" and message.tool_name == ToolName.VERIFY_IDENTITY:
+            break
+        if message.role == "user":
+            texts.insert(0, message.content)
+    return texts
+
+
+def _heard_identity(texts: list[str]) -> tuple[str | None, date | None]:
+    phone = next((p for t in reversed(texts) if (p := find_phone(t))), None)
+    birth = next((b for t in reversed(texts) if (b := find_birth_date(t))), None)
+    return phone, birth
+
+
 class RuleBasedLLM:
     """Kural tabanlı Türkçe diyalog politikası."""
 
     def decide(self, request: LLMRequest) -> LLMDecision:
         last = _last(request)
         if last is not None and last.role == "tool":
-            return LLMDecision(reply=self._verbalize(last))
+            return LLMDecision(reply=self._verbalize(last, request))
         user_text = last.content if last is not None and last.role == "user" else ""
         lowered = _lower(user_text)
 
@@ -143,14 +175,7 @@ class RuleBasedLLM:
     def _authenticate(self, request: LLMRequest) -> LLMDecision:
         # Son doğrulama denemesinden bu yana müşterinin söylediklerini birlikte değerlendir:
         # numara ve doğum tarihi ayrı turlarda verilebilir.
-        texts: list[str] = []
-        for message in reversed(request.messages):
-            if message.role == "tool" and message.tool_name == ToolName.VERIFY_IDENTITY:
-                break
-            if message.role == "user":
-                texts.insert(0, message.content)
-        phone = next((p for t in reversed(texts) if (p := find_phone(t))), None)
-        birth = next((b for t in reversed(texts) if (b := find_birth_date(t))), None)
+        phone, birth = _heard_identity(_identity_texts(request.messages))
         if phone and birth:
             return _call(ToolName.VERIFY_IDENTITY, phone=phone, birth_date=birth.isoformat())
         if phone:
@@ -183,7 +208,7 @@ class RuleBasedLLM:
             return LLMDecision(reply="Yaşadığınız sorunu biraz anlatır mısınız?")
         return _call(ToolName.CREATE_FAULT_TICKET, category=category, description=text.strip())
 
-    def _verbalize(self, message: Message) -> str:
+    def _verbalize(self, message: Message, request: LLMRequest) -> str:
         data: dict[str, Any] = json.loads(message.content)
         if message.is_error:
             if message.tool_name == ToolName.SELECT_PACKAGE and "zaten" in data.get("detail", ""):
@@ -198,7 +223,7 @@ class RuleBasedLLM:
                     )
                 if data["remaining_attempts"] <= 0:
                     return "Kimliğinizi doğrulayamadım. Sizi bir müşteri temsilcisine aktarıyorum."
-                return "Bilgiler eşleşmedi. Telefon numaranızı ve doğum tarihinizi tekrar söyler misiniz?"
+                return _identity_mismatch(request)
             case ToolName.GET_BILL:
                 year, month = data["period"].split("-")
                 items = sorted(data["items"], key=lambda i: Decimal(i["amount"]), reverse=True)
@@ -235,6 +260,22 @@ class RuleBasedLLM:
                 return "Sizi bir müşteri temsilcisine aktarıyorum, lütfen hatta kalın."
             case _:
                 return "İşleminiz tamamlandı."
+
+
+def _identity_mismatch(request: LLMRequest) -> str:
+    """Anlaşılan numara ve tarihi geri okur: hata STT'den mi müşteriden mi, müşteri duyabilsin."""
+    # Son mesaj doğrulama sonucudur; ondan önceki denemede söylenenlere bakılır.
+    phone, birth = _heard_identity(_identity_texts(request.messages[:-1]))
+    heard = ""
+    if phone and birth:
+        heard = (
+            f" Numaranızı {format_phone(phone)}, doğum tarihinizi {format_date(birth)} "
+            "olarak anladım."
+        )
+    return (
+        f"Bilgiler eşleşmedi.{heard} Telefon numaranızı ve doğum tarihinizi tekrar söyler "
+        "misiniz? İsterseniz ekrandaki alana yazabilirsiniz."
+    )
 
 
 def _call(name: ToolName, **arguments: Any) -> LLMDecision:

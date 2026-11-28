@@ -10,9 +10,12 @@ dependencies = [
     "httpx>=0.27",
     "langgraph>=0.2",
     "numpy>=2.0",
+    "prometheus-client>=0.21",
     "pydantic>=2.9",
     "pyyaml>=6.0.4",
+    "redis>=5.2",
     "uvicorn[standard]>=0.32",
+    "websockets>=13",
 ]
 
 [project.optional-dependencies]
@@ -63,7 +66,7 @@ packages = ["voice_agent", "mock_crm"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["faster_whisper.*", "piper.*", "huggingface_hub.*"]
+module = ["faster_whisper.*", "piper.*", "huggingface_hub.*", "onnxruntime.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

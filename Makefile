@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test eval bench-stt check chat crm up down
+.PHONY: install lint format typecheck test eval bench-stt bench-realtime serve check chat crm up down
 
 install:
 	uv sync
@@ -27,6 +27,14 @@ SAMPLES ?= 100
 MODELS ?= tiny base small medium large-v3-turbo
 bench-stt:
 	uv run --extra audio python -m voice_agent.evaluation.stt_benchmark --samples $(SAMPLES) --models $(MODELS)
+
+# Çalışan yığına (make up) WebSocket üzerinden sentetik sesle konuşur, gecikme dökümü çıkarır.
+bench-realtime:
+	uv run --extra audio python -m voice_agent.evaluation.realtime_bench --prometheus http://localhost:9090
+
+# Ağ geçidini Docker olmadan çalıştır: http://localhost:8000 (modeller ilk açılışta iner).
+serve:
+	uv run --extra audio uvicorn voice_agent.gateway.app:default_app --factory --port 8000
 
 check: lint typecheck test
 
