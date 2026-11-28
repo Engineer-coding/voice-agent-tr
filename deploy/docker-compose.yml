@@ -10,6 +10,10 @@ services:
     environment:
       REDIS_URL: redis://redis:6379/0
       CRM_URL: http://mock-crm:8100
+      STT_MODEL: ${STT_MODEL:-small}
+    volumes:
+      # Whisper ve Piper modelleri ilk açılışta indirilir; yeniden başlatmada tekrar inmesin.
+      - models:/root/.cache/huggingface
     depends_on:
       redis:
         condition: service_healthy
@@ -25,7 +29,7 @@ services:
     build:
       context: ..
       dockerfile: Dockerfile
-    command: ["uv", "run", "--no-dev", "uvicorn", "mock_crm.app:default_app", "--factory", "--host", "0.0.0.0", "--port", "8100"]
+    command: ["uv", "run", "--no-dev", "--no-sync", "uvicorn", "mock_crm.app:default_app", "--factory", "--host", "0.0.0.0", "--port", "8100"]
     ports:
       - "8100:8100"
     environment:
@@ -43,3 +47,32 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d"]
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - gateway
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    environment:
+      # Yerel demo: giriş yapmadan panoyu görüntüleme. Yönetici parolası ortamdan değiştirilebilir.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/voice-latency.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  models:

@@ -96,3 +96,16 @@ def concat(clips: list[AudioClip], gap_s: float = 0.15) -> AudioClip:
             parts.append(silence)
         parts.append(clip.samples)
     return AudioClip(np.concatenate(parts).astype(np.float32), rate)
+
+
+def pcm16_to_float(data: bytes) -> FloatAudio:
+    """Küçük endian 16 bit PCM baytlarını [-1, 1] float32'ye çevirir (tek bayt artığı atılır)."""
+    usable = len(data) - len(data) % 2
+    return (np.frombuffer(data[:usable], dtype="<i2").astype(np.float32) / 32768.0).astype(
+        np.float32
+    )
+
+
+def float_to_pcm16(samples: FloatAudio) -> bytes:
+    """[-1, 1] float sesi küçük endian 16 bit PCM baytlarına çevirir."""
+    return (np.clip(samples, -1.0, 1.0) * 32767).astype("<i2").tobytes()

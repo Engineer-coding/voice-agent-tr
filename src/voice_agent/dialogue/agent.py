@@ -55,10 +55,10 @@ class TurnState(TypedDict):
 
 
 class DialogueAgent:
-    def __init__(self, llm: LLM, crm: CRMClient) -> None:
+    def __init__(self, llm: LLM, crm: CRMClient, state: ConversationState | None = None) -> None:
         self.llm = llm
         self.executor = ToolExecutor(crm)
-        self.state = ConversationState()
+        self.state = state or ConversationState()
         self._graph = self._build()
 
     # --- genel API ---
